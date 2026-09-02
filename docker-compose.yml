@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: peblo
+      POSTGRES_PASSWORD: peblo
+      POSTGRES_DB: peblo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peblo -d peblo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://peblo:peblo@postgres:5432/peblo
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_EXPIRE_MINUTES: 480
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_PATH: /storage
+      SEED_ON_STARTUP: "true"
+      SEED_SHOWS_PATH: /seed/seed_shows.json
+      REFERENCE_PATH: /seed/reference.json
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@peblo.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-peblo-admin}
+      EDITOR_EMAIL: ${EDITOR_EMAIL:-editor@peblo.local}
+      EDITOR_PASSWORD: ${EDITOR_PASSWORD:-peblo-editor}
+    volumes:
+      - ./data:/seed:ro
+      - storage:/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  cms:
+    build:
+      context: ./cms
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+  viewer:
+    build:
+      context: ./viewer
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  storage:

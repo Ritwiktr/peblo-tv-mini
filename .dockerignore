@@ -1,0 +1,11 @@
+.venv
+**/node_modules
+**/dist
+.git
+_incoming
+**/.DS_Store
+**/__pycache__
+**/.pytest_cache
+storage
+*.md
+!README.md

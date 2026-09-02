@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: peblo
+          POSTGRES_PASSWORD: peblo
+          POSTGRES_DB: peblo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U peblo -d peblo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Lint
+        run: ruff check app tests
+      - name: Tests
+        env:
+          DATABASE_URL: postgresql+psycopg://peblo:peblo@localhost:5432/peblo
+          JWT_SECRET: ci-secret
+          SEED_ON_STARTUP: "false"
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [cms, viewer]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install & typecheck
+        working-directory: ${{ matrix.app }}
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npm run build
+
+  images:
+    runs-on: ubuntu-latest
+    needs: [lint-test, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: docker compose build
+
+  deploy:
+    # This job is the deploy *shape* — it does not push to a real cloud.
+    # In production we would:
+    #   1. Authenticate to the registry (GHCR / ECR) with OIDC, not long-lived keys.
+    #   2. Tag images with github.sha.
+    #   3. Push api, cms, viewer.
+    #   4. Apply a compose/k8s manifest that points at those tags.
+    #   5. Run a smoke GET /health against the new deployment; roll back the
+    #      previous image tag if it fails.
+    # We skip the actual push here so CI stays hermetic.
+    runs-on: ubuntu-latest
+    needs: [images]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Explain deploy (no-op)
+        run: |
+          echo "Would tag and push:"
+          echo "  ghcr.io/${{ github.repository }}/api:${{ github.sha }}"
+          echo "  ghcr.io/${{ github.repository }}/cms:${{ github.sha }}"
+          echo "  ghcr.io/${{ github.repository }}/viewer:${{ github.sha }}"
+          echo "Then roll the compose/k8s release to those tags and smoke /health."
+          echo "Secrets (JWT_SECRET, DB password, R2 keys) come from the platform"
+          echo "secret store — never from the image or this workflow file."
