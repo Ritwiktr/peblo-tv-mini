@@ -12,29 +12,38 @@ export function Layout({
   role: string;
 }) {
   const nav = useNavigate();
+  const initial = (email[0] || "P").toUpperCase();
   return (
     <>
       <header className="topbar">
-        <Link to="/" className="brand" style={{ textDecoration: "none" }}>
-          Peblo <span>CMS</span>
+        <Link to="/" className="brand">
+          <span className="brand-mark">PEBLO</span>
+          <span className="brand-sub">CMS</span>
         </Link>
         <nav className="nav">
           <NavLink to="/" end>
             Shows
           </NavLink>
           <NavLink to="/publish">Publish</NavLink>
-          <span className="muted">
-            {email} · {role}
-          </span>
-          <button
-            className="btn secondary"
-            onClick={() => {
-              setToken(null);
-              nav("/login");
-            }}
-          >
-            Sign out
-          </button>
+          <div className="nav-right">
+            <div className="user-chip">
+              <span className="avatar">{initial}</span>
+              <div className="who">
+                {email}
+                <span>{role}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => {
+                setToken(null);
+                nav("/login");
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </nav>
       </header>
       <main className="page">{children}</main>
@@ -43,7 +52,13 @@ export function Layout({
 }
 
 export function Loading() {
-  return <p className="muted">Loading…</p>;
+  return (
+    <div>
+      <div className="skeleton" />
+      <div className="skeleton" />
+      <div className="skeleton" />
+    </div>
+  );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
@@ -63,4 +78,8 @@ export function ErrorBox({ error }: { error: unknown }) {
     return <div className="banner error">Please sign in again.</div>;
   }
   return <div className="banner error">{err.message || "Something went wrong."}</div>;
+}
+
+export function StatusPill({ status }: { status: string }) {
+  return <span className={`pill ${status}`}>{status}</span>;
 }

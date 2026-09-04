@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 
@@ -8,6 +9,13 @@ from sqlalchemy.orm import Session
 from app.models import PublishRun, User
 from app.services.catalog import LIVE_KEY, build_catalogue
 from app.storage.base import StorageBackend
+
+
+def catalogue_digest(doc: dict) -> str:
+    """Hash the catalogue body, ignoring published_at so re-publishes compare equal."""
+    body = {k: v for k, v in doc.items() if k != "published_at"}
+    blob = json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
 
 
 def publish_catalogue(db: Session, storage: StorageBackend, user: User | None) -> PublishRun:
@@ -24,7 +32,15 @@ def publish_catalogue(db: Session, storage: StorageBackend, user: User | None) -
         doc, warnings = build_catalogue(db, storage)
         payload = json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8")
         version_key = f"catalogues/catalogue-{run.id}.json"
-        storage.atomic_put_json(LIVE_KEY, version_key, payload)
+
+        live = load_live_catalogue(storage)
+        if live and catalogue_digest(live) == catalogue_digest(doc):
+            storage.put(version_key, payload, "application/json")
+            warnings = list(warnings) + [
+                "Idempotent: catalogue body unchanged, live file left as-is."
+            ]
+        else:
+            storage.atomic_put_json(LIVE_KEY, version_key, payload)
 
         run.status = "success"
         run.show_count = doc["show_count"]

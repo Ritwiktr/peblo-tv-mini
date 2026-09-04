@@ -38,6 +38,7 @@ class User(Base):
 class Show(Base):
     __tablename__ = "shows"
     __table_args__ = (
+        # CMS list + validation filter by both columns together.
         Index("ix_shows_section_status", "section", "status"),
     )
 
@@ -78,6 +79,7 @@ class Season(Base):
 class Episode(Base):
     __tablename__ = "episodes"
     __table_args__ = (
+        # Publish collapses variants; CMS 409 checks this pair on write.
         Index("ix_episodes_content_group_lang", "content_group", "language"),
         Index("ix_episodes_status", "status"),
     )
@@ -130,6 +132,10 @@ class Artwork(Base):
 
 class PublishRun(Base):
     __tablename__ = "publish_runs"
+    __table_args__ = (
+        # CMS run history is `ORDER BY started_at DESC LIMIT 50`.
+        Index("ix_publish_runs_started_at", "started_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     triggered_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(

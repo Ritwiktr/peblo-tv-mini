@@ -123,11 +123,13 @@ export type Episode = {
 };
 export type ValidationReport = {
   can_publish: boolean;
+  clean?: boolean;
   blocking_count: number;
   blocking: { code: string; message: string }[];
   warnings: { code: string; message: string }[];
   ingest_warnings?: { code: string; message: string }[];
   by_show: { show_id: string; title: string; issues: { message: string }[] }[];
+  preview?: { show_count: number; episode_count: number; sections: { id: string; title: string; show_count: number }[] };
   hint: string;
 };
 export type PublishRun = {

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { Empty, ErrorBox, Loading } from "../components/Layout";
+import { Empty, ErrorBox, Loading, StatusPill } from "../components/Layout";
 
 export default function Shows() {
   const [q, setQ] = useState("");
@@ -15,20 +15,27 @@ export default function Shows() {
     queryKey: ["shows", q, section, status, language, page],
     queryFn: () => api.shows({ q, section, status, language, page, page_size: 12 }),
   });
+  const total = shows.data?.total ?? 0;
 
   return (
     <>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <h1>Shows</h1>
-        <Link to="/shows/new" className="btn" style={{ textDecoration: "none" }}>
+      <div className="page-head">
+        <div>
+          <h1>Shows</h1>
+          <p className="lede">
+            {total ? `${total} title${total === 1 ? "" : "s"} in the library.` : "Catalogue titles editors can fix and publish."}
+          </p>
+        </div>
+        <Link to="/shows/new" className="btn accent">
           New show
         </Link>
       </div>
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card toolbar">
         <div className="row">
-          <div style={{ flex: 2 }}>
-            <label>Search</label>
+          <div className="field grow">
+            <label htmlFor="show-q">Search</label>
             <input
+              id="show-q"
               placeholder="Title or synopsis"
               value={q}
               onChange={(e) => {
@@ -37,9 +44,10 @@ export default function Shows() {
               }}
             />
           </div>
-          <div style={{ flex: 1 }}>
-            <label>Section</label>
+          <div className="field">
+            <label htmlFor="show-section">Section</label>
             <select
+              id="show-section"
               value={section}
               onChange={(e) => {
                 setPage(1);
@@ -52,9 +60,10 @@ export default function Shows() {
               ))}
             </select>
           </div>
-          <div style={{ flex: 1 }}>
-            <label>Status</label>
+          <div className="field">
+            <label htmlFor="show-status">Status</label>
             <select
+              id="show-status"
               value={status}
               onChange={(e) => {
                 setPage(1);
@@ -66,9 +75,10 @@ export default function Shows() {
               <option value="draft">draft</option>
             </select>
           </div>
-          <div style={{ flex: 1 }}>
-            <label>Language</label>
+          <div className="field">
+            <label htmlFor="show-lang">Language</label>
             <select
+              id="show-lang"
               value={language}
               onChange={(e) => {
                 setPage(1);
@@ -76,8 +86,8 @@ export default function Shows() {
               }}
             >
               <option value="">All</option>
-              <option value="en">en</option>
-              <option value="hi">hi</option>
+              <option value="en">English</option>
+              <option value="hi">हिन्दी</option>
             </select>
           </div>
         </div>
@@ -85,44 +95,48 @@ export default function Shows() {
       {shows.isLoading && <Loading />}
       {shows.isError && <ErrorBox error={shows.error} />}
       {shows.data && shows.data.items.length === 0 && (
-        <Empty>No shows match those filters. Try clearing search, or create a new show.</Empty>
+        <Empty>
+          No shows match those filters.
+          <div style={{ marginTop: 12 }}>
+            <Link to="/shows/new" className="btn">
+              Create a show
+            </Link>
+          </div>
+        </Empty>
       )}
       {shows.data && shows.data.items.length > 0 && (
-        <div className="card">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Section</th>
-                <th>Status</th>
-                <th>Episodes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shows.data.items.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <Link to={`/shows/${s.id}`}>{s.title}</Link>
-                    <div className="muted">{s.slug}</div>
-                  </td>
-                  <td>{s.section || "—"}</td>
-                  <td>
-                    <span className={`pill ${s.status}`}>{s.status}</span>
-                  </td>
-                  <td>{s.episode_count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <>
+          <div className="show-list">
+            {shows.data.items.map((s) => {
+              const poster = s.artwork?.find((a) => a.kind === "poster");
+              return (
+                <Link key={s.id} className="show-item" to={`/shows/${s.id}`}>
+                  <div className="show-poster">
+                    {poster ? <img src={poster.url} alt="" /> : "No art"}
+                  </div>
+                  <div>
+                    <h3>{s.title}</h3>
+                    <div className="meta">
+                      <span className="muted">{s.section || "No section"}</span>
+                      <span className="muted">·</span>
+                      <span className="muted">{s.slug}</span>
+                    </div>
+                  </div>
+                  <span className="ep-count">{s.episode_count} episodes</span>
+                  <StatusPill status={s.status} />
+                </Link>
+              );
+            })}
+          </div>
           <div className="pager">
-            <button className="btn secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            <button type="button" className="btn secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
               Previous
             </button>
             <span className="muted">
-              Page {page} of {Math.max(1, Math.ceil(shows.data.total / shows.data.page_size))} ·{" "}
-              {shows.data.total} shows
+              Page {page} of {Math.max(1, Math.ceil(shows.data.total / shows.data.page_size))}
             </span>
             <button
+              type="button"
               className="btn secondary"
               disabled={page * shows.data.page_size >= shows.data.total}
               onClick={() => setPage(page + 1)}
@@ -130,7 +144,7 @@ export default function Shows() {
               Next
             </button>
           </div>
-        </div>
+        </>
       )}
     </>
   );

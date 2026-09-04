@@ -63,8 +63,21 @@ jobs:
     needs: [lint-test, frontend]
     steps:
       - uses: actions/checkout@v4
-      - name: Build images
-        run: docker compose build
+      - name: Build and smoke compose
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              curl -fsS -o /dev/null http://localhost:8080/
+              curl -fsS -o /dev/null http://localhost:8081/
+              docker compose down -v
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose logs
+          docker compose down -v
+          exit 1
 
   deploy:
     # This job is the deploy *shape* — it does not push to a real cloud.

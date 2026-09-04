@@ -1,74 +1,73 @@
-import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { BellIcon, Caret, SearchIcon } from "./Icons";
 
-const CATS = [
-  "",
-  "adventure",
-  "folk",
-  "friendship",
-  "india",
-  "language",
-  "learning",
-  "maths",
-  "music",
-  "nature",
-  "reading",
-  "science",
-  "singalong",
-  "stories",
-  "travel",
-  "values",
-];
-
-export function Nav({
-  q = "",
-  category = "",
-  language = "",
-}: {
-  q?: string;
-  category?: string;
-  language?: string;
-}) {
+export function Nav({ q = "" }: { q?: string; category?: string; language?: string }) {
   const nav = useNavigate();
+  const loc = useLocation();
   const [query, setQuery] = useState(q);
-  const [cat, setCat] = useState(category);
-  const [lang, setLang] = useState(language);
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(!!q);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   function go(e: FormEvent) {
     e.preventDefault();
-    const p = new URLSearchParams();
+    const p = new URLSearchParams(loc.search);
     if (query) p.set("q", query);
-    if (cat) p.set("category", cat);
-    if (lang) p.set("language", lang);
+    else p.delete("q");
     nav(`/search?${p}`);
   }
 
   return (
-    <header className="nav">
+    <header className={`nav ${scrolled || loc.pathname !== "/" ? "scrolled" : ""}`}>
       <Link to="/" className="logo">
-        PEBLO <span>TV</span>
+        PEBLO
       </Link>
-      <form className="searchbar" onSubmit={go}>
-        <input
-          placeholder="Search shows & episodes"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <select value={cat} onChange={(e) => setCat(e.target.value)}>
-          <option value="">All categories</option>
-          {CATS.filter(Boolean).map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <select value={lang} onChange={(e) => setLang(e.target.value)}>
-          <option value="">All languages</option>
-          <option value="en">English</option>
-          <option value="hi">Hindi</option>
-        </select>
-        <button type="submit" style={{ background: "var(--gold)", color: "#111", border: 0, borderRadius: 999, padding: "8px 14px", cursor: "pointer" }}>
-          Search
+      <nav className="nav-links">
+        <NavLink to="/" end className={({ isActive }) => (isActive ? "active" : "")}>
+          Home
+        </NavLink>
+        <NavLink to="/search?section=series">TV Shows</NavLink>
+        <NavLink to="/search?section=songs">Movies</NavLink>
+        <NavLink to="/search?section=minisodes">New & Popular</NavLink>
+        <NavLink to="/search?language=hi">My List</NavLink>
+        <NavLink to="/search?language=hi">Browse by Languages</NavLink>
+      </nav>
+      <div className="nav-right">
+        {open ? (
+          <form className="search-wrap" onSubmit={go}>
+            <SearchIcon size={16} />
+            <input
+              className="search-field"
+              type="search"
+              autoFocus
+              placeholder="Titles, people, genres"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onBlur={() => {
+                if (!query) setOpen(false);
+              }}
+            />
+          </form>
+        ) : (
+          <button type="button" className="icon-btn" onClick={() => setOpen(true)} aria-label="Search">
+            <SearchIcon />
+          </button>
+        )}
+        <button type="button" className="icon-btn" aria-label="Notifications">
+          <BellIcon />
         </button>
-      </form>
+        <button type="button" className="profile">
+          <span className="avatar">K</span>
+          <Caret />
+        </button>
+      </div>
     </header>
   );
 }

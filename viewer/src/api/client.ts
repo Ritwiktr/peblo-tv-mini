@@ -39,6 +39,8 @@ export type Catalogue = {
 
 export const api = {
   catalog: () => get<Catalogue>("/catalog"),
+  meta: () => get<{ sections: string[]; categories: string[]; languages: string[] }>("/catalog/meta"),
+  show: (slug: string) => get<Show>(`/catalog/shows/${slug}`),
   search: (params: Record<string, string>) => {
     const q = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {

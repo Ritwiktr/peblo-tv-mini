@@ -52,7 +52,7 @@ A unique DB constraint on `(content_group, language)` would have dropped `ep_900
 
 ## Decisions
 
-**Schema.** `shows → seasons → episodes`, artwork polymorphic on show *or* episode, `publish_runs` for history. Indexes: `shows(section,status)`, `episodes(content_group, language)`, `shows.slug` unique. JSON `categories` because the list is small and filter-shaped, not join-shaped.
+**Schema.** `shows → seasons → episodes`, artwork polymorphic on show *or* episode, `publish_runs` for history. Indexes: `shows(section,status)` for CMS lists, `episodes(content_group, language)` for grouping/409, `publish_runs.started_at` for run history (`002` migration), `shows.slug` unique. JSON `categories` because the list is small and filter-shaped, not join-shaped.
 
 **Season 0.** Stored as a real season (the CMS should still be able to edit trailers). The catalogue builder attaches it as `trailer` and never as a season row.
 
@@ -61,6 +61,12 @@ A unique DB constraint on `(content_group, language)` would have dropped `ep_900
 **Artwork.** Server-side only that matters. Aspect within 4%, size within 12% of the `reference.json` targets, 200 KB ceiling. Errors are written for an editor (“This poster is 900×600… please upload 2:3 around 600×900”), not for a stack trace. Storage is a `StorageBackend` (`put` / `get` / `url` / `atomic_put_json`). Local disk is the default; `STORAGE_BACKEND=r2` plus the `R2_*` vars swaps in Cloudflare R2. Call sites do not change.
 
 **Auth.** JWT Bearer. `editor` = CRUD. `admin` = CRUD + publish + rollback. Enforced in FastAPI dependencies, not the UI.
+
+**Artwork surfaces (viewer).** Banner on the hero/billboard, poster (2:3) on rails and search grid, thumbnail on episode rows. Rails are the catalogue sections plus an “Available in Hindi” filter derived from published language variants — we do not duplicate titles to fake a Netflix-length row.
+
+**Schema on boot.** Postgres runs `alembic upgrade head`. SQLite tests use `create_all` because the migration is JSONB/Postgres-only. If an existing volume was created with `create_all` (no `alembic_version` row), we `stamp` head instead of recreating tables.
+
+**Publish gate.** The job always writes the *eligible* subset (published + section + duration + artwork, languages collapsed). The CMS dry-run shows the counts that would go live. Rows with issues are listed as omitted, not as a padlock on the button. First boot uses that same job so the viewer isn’t empty while editors still see the seed problems.
 
 ## Part E — written
 
@@ -71,8 +77,9 @@ We never overwrite the live file in place. Flow:
 1. Insert `publish_runs` as `running`.
 2. Build the JSON in memory.
 3. Write `catalogues/catalogue-{run_id}.json` (versioned, complete).
-4. Write a sibling `.tmp` and `os.replace` it onto `catalogues/catalogue.json`. POSIX `rename` on the same filesystem is atomic — a reader never sees a half-written document.
-5. Mark the run `success` (or `failed` with the error).
+4. If the catalogue *body* (everything except `published_at`) matches the live file, we skip the live replace — the run is still recorded. That’s the idempotent path.
+5. Otherwise write a sibling `.tmp` and `os.replace` it onto `catalogues/catalogue.json`. POSIX `rename` on the same filesystem is atomic — a reader never sees a half-written document.
+6. Mark the run `success` (or `failed` with the error).
 
 If the process dies at 2–3: live file unchanged, run stuck in `running` (alert on that; see below). If it dies between 3 and 4: versioned file exists, live unchanged; republish or rollback. If it dies after 4 before 5: live catalogue is already the new complete file; the run row looks stale until the next successful publish. R2 has no cross-key rename, so we PUT the version object then PUT the live key; each GET still sees a complete object.
 
@@ -84,7 +91,7 @@ Set `STORAGE_BACKEND=r2`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS
 
 ### 3. Search
 
-`GET /catalog/search` filters the **published file** in process (title, episode title, category; `q` + `category` + `language` + `section` AND together). The viewer does not scan the catalogue in the browser.
+`GET /catalog/search` filters the **published file** in process (title, episode title, category; `q` + `category` + `language` + `section` AND together). Facet lists come from `GET /catalog/meta`. A title page is `GET /catalog/shows/{slug}` — the viewer never calls `/admin/*` and does not walk the whole catalogue in the browser to open a show.
 
 At this size (~8 shows) it’s noise. It stays fine into the low tens of thousands of grouped episodes on a 512 MB function. After that: don’t parse the whole file per request — keep the published document in memory (or Redis), and/or add Postgres FTS / a search engine on publish. Next step I’d take in production: load the live catalogue once, refresh on successful publish, optionally push into OpenSearch if we need typos and ranking.
 
@@ -96,7 +103,7 @@ Where it bites: **freshness**. An editor’s save is invisible until publish. Th
 
 ### 5. Left out, and AI
 
-Left out on purpose: a real video player, transcoding, per-episode playback tokens, SSO, i18n of the CMS chrome, a dry-run visual diff (rollback + versioned files are the stretch I kept), an append-only audit log of field-level edits.
+Left out on purpose: a real video player, transcoding, per-episode playback tokens, SSO, i18n of the CMS chrome, an append-only audit log of field-level edits. Continue Watching is omitted rather than faked — there’s no playback progress in this take-home.
 
 AI: **Cursor Grok 4.6** wrote most of this repo. I accepted the overall shape (three processes, storage ABC, atomic replace, seed-visible duplicates). I rejected a unique DB constraint that would have swallowed `ep_9001`, client-side-only image checks, and searching the catalogue in the viewer.
 
@@ -112,7 +119,7 @@ AI: **Cursor Grok 4.6** wrote most of this repo. I accepted the overall shape (t
 
 ## CI
 
-`.github/workflows/ci.yml`: ruff + pytest (Postgres service), frontend typecheck/build, `docker compose build`. The **deploy** job is written and explained; it does not push to a real registry.
+`.github/workflows/ci.yml`: ruff + pytest (Postgres service + Alembic on CI), frontend typecheck/build, `docker compose up` until `/health` + viewer + CMS respond. The **deploy** job is written and explained; it does not push to a real registry.
 
 ## Time (approx.)
 
@@ -127,4 +134,4 @@ AI: **Cursor Grok 4.6** wrote most of this repo. I accepted the overall shape (t
 cd backend && pytest -q
 ```
 
-Risky bits covered: artwork aspect/size/KB, filter composition, atomic replace, role enforcement, duplicate `(content_group, language)` on write.
+Risky bits covered: artwork aspect/size/KB (including HTTP 422 on poster, banner, and thumbnail), language grouping on publish, idempotent re-publish, filter composition, atomic replace, role enforcement, duplicate `(content_group, language)` on write, catalogue slug + meta endpoints.

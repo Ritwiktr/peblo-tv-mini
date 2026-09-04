@@ -6,9 +6,10 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.db import SessionLocal, engine
-from app.models import Base, User
+from app.db import SessionLocal
+from app.models import User
 from app.routers import admin, artwork, auth, catalog, cms, health
+from app.schema import apply_schema
 from app.services.catalog import LIVE_KEY
 from app.services.publish import publish_catalogue
 from app.services.seed import seed_content, seed_users
@@ -17,7 +18,7 @@ from app.storage import get_storage
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    apply_schema()
     settings = get_settings()
     db = SessionLocal()
     try:

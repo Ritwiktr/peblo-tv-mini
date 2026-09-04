@@ -7,10 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Episode, Season, Show
+from app.services.catalog import build_catalogue
+from app.storage import get_storage
 
 
 def validation_report(db: Session) -> dict[str, Any]:
-    """Everything currently blocking a clean publish, grouped for an editor."""
+    """Editor-facing report plus a dry-run of what publish would actually write."""
     shows = (
         db.execute(
             select(Show).options(
@@ -139,16 +141,35 @@ def validation_report(db: Session) -> dict[str, Any]:
             first = rows[0]
             bucket(first.season.show)["issues"].append(issue)
 
-    can_publish = len(blocking) == 0
+    doc, pub_warnings = build_catalogue(db, get_storage())
+    preview = {
+        "show_count": doc["show_count"],
+        "episode_count": doc["episode_count"],
+        "sections": [
+            {"id": s["id"], "title": s["title"], "show_count": len(s["shows"])} for s in doc["sections"]
+        ],
+    }
+
+    can_publish = preview["show_count"] > 0
+    clean = len(blocking) == 0
+    if not can_publish:
+        hint = "Nothing eligible yet — a published show needs a section plus at least one complete episode."
+    elif not clean:
+        hint = (
+            f"An admin can still publish the eligible subset "
+            f"({preview['show_count']} shows / {preview['episode_count']} episodes). "
+            "Blocking items below are omitted from the viewer until they’re fixed."
+        )
+    else:
+        hint = "Looks good — an admin can publish this catalogue."
     return {
         "can_publish": can_publish,
+        "clean": clean,
         "blocking_count": len(blocking),
         "blocking": blocking,
         "warnings": warnings,
         "by_show": [v for v in by_show.values() if v["issues"]],
-        "hint": (
-            "Fix the blocking items, then ask an admin to publish."
-            if not can_publish
-            else "Looks good — an admin can publish this catalogue."
-        ),
+        "preview": preview,
+        "publish_warnings": pub_warnings,
+        "hint": hint,
     }

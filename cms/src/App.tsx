@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { api, getToken } from "./api/client";
-import { ErrorBox, Layout, Loading } from "./components/Layout";
+import { ErrorBox, Layout } from "./components/Layout";
 import Login from "./pages/Login";
 import Publish from "./pages/Publish";
 import ShowEdit from "./pages/ShowEdit";
@@ -14,7 +14,18 @@ function Shell() {
   const token = getToken();
   const me = useQuery({ queryKey: ["me"], queryFn: api.me, enabled: !!token, retry: false });
   if (!token) return <Navigate to="/login" replace />;
-  if (me.isLoading) return <Loading />;
+  if (me.isLoading) {
+    return (
+      <div className="splash">
+        <div>
+          <div className="brand-mark" style={{ color: "#e50914" }}>
+            PEBLO
+          </div>
+          <p className="muted">Loading studio…</p>
+        </div>
+      </div>
+    );
+  }
   if (me.isError) {
     return (
       <div className="page">
