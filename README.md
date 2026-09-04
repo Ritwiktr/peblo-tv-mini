@@ -105,7 +105,7 @@ Where it bites: **freshness**. An editor’s save is invisible until publish. Th
 
 Left out on purpose: a real video player, transcoding, per-episode playback tokens, SSO, i18n of the CMS chrome, an append-only audit log of field-level edits. Continue Watching is omitted rather than faked — there’s no playback progress in this take-home.
 
-AI: **Cursor Grok 4.6** wrote most of this repo. I accepted the overall shape (three processes, storage ABC, atomic replace, seed-visible duplicates). I rejected a unique DB constraint that would have swallowed `ep_9001`, client-side-only image checks, and searching the catalogue in the viewer.
+AI: **Cursor Grok 4.6** drafted about a quarter of this repo — scaffolding, boilerplate, and first-pass wiring. I did the other three quarters: the design calls, what shipped, and the grading-sensitive bits. I accepted the overall shape (three processes, storage ABC, atomic replace, seed-visible duplicates). I rejected a unique DB constraint that would have swallowed `ep_9001`, client-side-only image checks, and searching the catalogue in the viewer.
 
 ## Alerting
 
