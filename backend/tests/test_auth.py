@@ -94,3 +94,18 @@ def test_admin_can_publish(client):
     cat = client.get("/catalog")
     assert cat.status_code == 200
     assert "sections" in cat.json()
+
+
+def test_admin_save_published_show_lists_it_on_viewer(client):
+    token = _login(client, "admin@peblo.local", "peblo-admin")
+    headers = {"Authorization": f"Bearer {token}"}
+    r = client.post(
+        "/admin/shows",
+        json={"title": "Listed On Save", "section": "series", "status": "published"},
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    cat = client.get("/catalog")
+    assert cat.status_code == 200
+    titles = [s["title"] for sec in cat.json()["sections"] for s in sec["shows"]]
+    assert "Listed On Save" in titles

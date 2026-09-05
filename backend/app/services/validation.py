@@ -28,7 +28,7 @@ def validation_report(db: Session) -> dict[str, Any]:
     warnings: list[dict] = []
     by_show: dict[str, dict] = {}
 
-    def bucket(show: Show) -> dict:
+    def show_issues(show: Show) -> dict:
         key = str(show.id)
         if key not in by_show:
             by_show[key] = {
@@ -51,7 +51,7 @@ def validation_report(db: Session) -> dict[str, Any]:
                 "message": f"'{show.title}' is published but has no section. Pick Featured, Series, Minisodes, or Songs.",
             }
             blocking.append(issue)
-            bucket(show)["issues"].append(issue)
+            show_issues(show)["issues"].append(issue)
 
         if show.status == "published":
             missing = [k for k in ("poster", "banner", "thumbnail") if k not in art_kinds]
@@ -63,7 +63,7 @@ def validation_report(db: Session) -> dict[str, Any]:
                     "message": f"'{show.title}' is published but missing {labels}. Upload them on the show page.",
                 }
                 blocking.append(issue)
-                bucket(show)["issues"].append(issue)
+                show_issues(show)["issues"].append(issue)
 
         for season in show.seasons:
             for ep in season.episodes:
@@ -78,7 +78,7 @@ def validation_report(db: Session) -> dict[str, Any]:
                         "episode_id": str(ep.id),
                     }
                     blocking.append(issue)
-                    bucket(show)["issues"].append(issue)
+                    show_issues(show)["issues"].append(issue)
                 if not ep.artwork:
                     issue = {
                         "code": "episode_missing_artwork",
@@ -87,7 +87,7 @@ def validation_report(db: Session) -> dict[str, Any]:
                         "episode_id": str(ep.id),
                     }
                     blocking.append(issue)
-                    bucket(show)["issues"].append(issue)
+                    show_issues(show)["issues"].append(issue)
 
         if show.status == "draft":
             warnings.append(
@@ -107,18 +107,18 @@ def validation_report(db: Session) -> dict[str, Any]:
                 if key in seen_local:
                     continue
                 seen_local.add(key)
-                bucket = title_map.setdefault(key, {"sample": ep.title, "shows": []})
-                if show.title not in bucket["shows"]:
-                    bucket["shows"].append(show.title)
-    for bucket in title_map.values():
-        uniq = bucket["shows"]
+                entry = title_map.setdefault(key, {"sample": ep.title, "shows": []})
+                if show.title not in entry["shows"]:
+                    entry["shows"].append(show.title)
+    for copied in title_map.values():
+        uniq = copied["shows"]
         if len(uniq) >= 3:
             warnings.append(
                 {
                     "code": "copied_episode_title",
                     "severity": "info",
                     "message": (
-                        f"“{bucket['sample']}” is used as an episode title on {len(uniq)} shows "
+                        f"“{copied['sample']}” is used as an episode title on {len(uniq)} shows "
                         f"({', '.join(uniq)}). If this was copy-paste from another series, rename them."
                     ),
                 }
@@ -139,7 +139,7 @@ def validation_report(db: Session) -> dict[str, Any]:
             blocking.append(issue)
             # attach to the first show we can
             first = rows[0]
-            bucket(first.season.show)["issues"].append(issue)
+            show_issues(first.season.show)["issues"].append(issue)
 
     doc, pub_warnings = build_catalogue(db, get_storage())
     preview = {

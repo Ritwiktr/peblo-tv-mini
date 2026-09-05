@@ -187,6 +187,19 @@ button, input { font: inherit; color: inherit; }
 .tcard-art img.on, .poster-art img.on { opacity: 1; }
 .ph { position: absolute; inset: 0; background: linear-gradient(90deg, #2f2f2f, #3a3a3a, #2f2f2f); background-size: 200% 100%; animation: shine 1.4s infinite; }
 @keyframes shine { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.art-fallback {
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg, #5a1c24, #1a1a1a);
+}
+.card-name {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  z-index: 2;
+  padding: 32px 10px 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,.9));
+  font-size: 14px; font-weight: 700; line-height: 1.25;
+  color: #fff;
+  pointer-events: none;
+}
 
 .tcard-extra {
   padding: 0 10px; max-height: 0; opacity: 0; overflow: hidden;
@@ -199,7 +212,7 @@ button, input { font: inherit; color: inherit; }
   position: relative; z-index: 12;
 }
 .tcard:hover .tcard-extra {
-  max-height: 140px; opacity: 1; padding: 10px;
+  max-height: 180px; opacity: 1; padding: 10px;
 }
 .tcard-btns { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
 .round {
@@ -208,6 +221,9 @@ button, input { font: inherit; color: inherit; }
 }
 .round.fill { background: #fff; color: #000; border-color: #fff; }
 .round.push { margin-left: auto; }
+.tcard-showname {
+  font-size: 13px; font-weight: 700; line-height: 1.25; margin-bottom: 6px; color: #fff;
+}
 .tcard-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 11px; font-weight: 600; }
 .tcard-tags { color: #fff; font-size: 11px; margin-top: 6px; }
 .watch-bar {

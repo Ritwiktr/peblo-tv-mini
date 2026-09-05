@@ -13,18 +13,31 @@ function matchPct(id: string): number {
   return 86 + (n % 13);
 }
 
-export function TitleCard({ show }: { show: Show }) {
+function PosterArt({ show }: { show: Show }) {
   const src = show.artwork?.poster;
   const [on, setOn] = useState(false);
+  return (
+    <>
+      {src ? (
+        <>
+          {!on && <div className="ph" />}
+          <img src={src} alt="" loading="lazy" className={on ? "on" : ""} onLoad={() => setOn(true)} />
+        </>
+      ) : (
+        <div className="art-fallback" aria-hidden="true" />
+      )}
+      <div className="card-name">{show.title}</div>
+    </>
+  );
+}
+
+export function TitleCard({ show }: { show: Show }) {
   const eps = epCount(show);
   return (
     <div className="tcard">
-      <Link to={`/show/${show.slug}`} className="tcard-scale">
+      <Link to={`/show/${show.slug}`} className="tcard-scale" aria-label={show.title}>
         <div className="tcard-art">
-          {!on && <div className="ph" />}
-          {src && (
-            <img src={src} alt={show.title} loading="lazy" className={on ? "on" : ""} onLoad={() => setOn(true)} />
-          )}
+          <PosterArt show={show} />
         </div>
         <div className="tcard-extra">
           <div className="tcard-btns">
@@ -41,6 +54,7 @@ export function TitleCard({ show }: { show: Show }) {
               <ChevronDown />
             </span>
           </div>
+          <div className="tcard-showname">{show.title}</div>
           <div className="tcard-meta">
             <span className="match">{matchPct(show.id)}% Match</span>
             <span className="rated">TV-Y7</span>
@@ -55,16 +69,11 @@ export function TitleCard({ show }: { show: Show }) {
 }
 
 export function PosterCard({ show, rank }: { show: Show; rank?: number }) {
-  const src = show.artwork?.poster;
-  const [on, setOn] = useState(false);
   return (
-    <Link to={`/show/${show.slug}`} className="poster">
+    <Link to={`/show/${show.slug}`} className="poster" aria-label={show.title}>
       {rank !== undefined && <span className="rank">{rank}</span>}
       <div className="poster-art">
-        {!on && <div className="ph" />}
-        {src && (
-          <img src={src} alt={show.title} loading="lazy" className={on ? "on" : ""} onLoad={() => setOn(true)} />
-        )}
+        <PosterArt show={show} />
       </div>
     </Link>
   );

@@ -69,8 +69,8 @@ export default function ShowEdit() {
           <h1>{isNew ? "New show" : form.title || "Edit show"}</h1>
           <p className="lede">
             {isNew
-              ? "Save the title first, then upload the three artwork sizes and add episodes."
-              : "Poster, banner, and thumbnail are all required before this title can go out cleanly."}
+              ? "Set status to published and pick a section, then save — it will be listed on Peblo TV."
+              : "Published + a section lists this title on Peblo TV when you save. Artwork is optional."}
           </p>
         </div>
         <div className="sticky-actions">

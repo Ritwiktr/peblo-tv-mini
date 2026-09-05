@@ -11,6 +11,7 @@ from app.db import get_db
 from app.deps import require_editor
 from app.models import Artwork, Episode, Season, Show, User
 from app.schemas import EpisodeIn, EpisodeOut, EpisodePatch, ShowIn, ShowListOut, ShowOut, ShowPatch, ArtworkOut
+from app.services.publish import publish_catalogue
 from app.storage import get_storage
 
 router = APIRouter(prefix="/admin", tags=["cms"])
@@ -23,6 +24,13 @@ ALLOWED_LANG = {"en", "hi"}
 def _slugify(title: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
     return s or "show"
+
+
+def _list_on_viewer(db: Session, user: User) -> None:
+    """Admins: rewrite the live catalogue so a published+sectioned show is listed."""
+    if user.role != "admin":
+        return
+    publish_catalogue(db, get_storage(), user)
 
 
 def _art_out(records: list[Artwork]) -> list[ArtworkOut]:
@@ -142,6 +150,8 @@ def create_show(body: ShowIn, db: Session = Depends(get_db), _user: User = Depen
     db.add(show)
     db.commit()
     db.refresh(show)
+    if show.status == "published":
+        _list_on_viewer(db, _user)
     return _show_out(show)
 
 
@@ -169,6 +179,7 @@ def patch_show(
         raise HTTPException(400, "Status must be draft or published.")
     if "section" in data and data["section"] and data["section"] not in ALLOWED_SECTIONS:
         raise HTTPException(400, f"Section must be one of: {', '.join(sorted(ALLOWED_SECTIONS))}.")
+    old_status = show.status
     new_status = data.get("status", show.status)
     new_section = data.get("section", show.section)
     if new_status == "published" and not new_section:
@@ -185,6 +196,8 @@ def patch_show(
         .options(selectinload(Show.artwork), selectinload(Show.seasons).selectinload(Season.episodes))
         .where(Show.id == show_id)
     ).scalar_one()
+    if old_status == "published" or show.status == "published":
+        _list_on_viewer(db, _user)
     return _show_out(show)
 
 
@@ -193,8 +206,11 @@ def delete_show(show_id: UUID, db: Session = Depends(get_db), _user: User = Depe
     show = db.get(Show, show_id)
     if not show:
         raise HTTPException(404, "We couldn't find that show.")
+    was_live = show.status == "published"
     db.delete(show)
     db.commit()
+    if was_live:
+        _list_on_viewer(db, _user)
 
 
 @router.get("/shows/{show_id}/episodes", response_model=list[EpisodeOut])
